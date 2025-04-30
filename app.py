@@ -1,47 +1,33 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os
-from werkzeug.utils import secure_filename
+from lavis.models import load_model_and_preprocess
+from PIL import Image
+import torch
+import io
 
 app = Flask(__name__)
 CORS(app)
-app.config['UPLOAD_FOLDER'] = 'uploads/'
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-@app.route('/api/chat', methods=['POST'])
-def chat():
-    data = request.json
-    user_message = data.get('message', '')
-    response = f"Echo: {user_message}"  # Dummy AI Response for now
-    return jsonify({"response": response})
+# Load BLIP-2 model once at startup
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model, vis_processors, txt_processors = load_model_and_preprocess(
+    name="blip2_opt",
+    model_type="pretrain_opt2.7b",
+    is_eval=True,
+    device=device
+)
 
-@app.route('/api/image', methods=['POST'])
-def process_image():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
+@app.route("/api/image", methods=["POST"])
+def analyze_image():
+    if "file" not in request.files:
+        return jsonify({"error": "No image file provided"}), 400
 
-    file = request.files['file']
-    filename = secure_filename(file.filename)
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(filepath)
+    image_file = request.files["file"]
+    raw_image = Image.open(io.BytesIO(image_file.read())).convert("RGB")
+    image = vis_processors["eval"](raw_image).unsqueeze(0).to(device)
 
-    # Dummy response
-    response = f"Received and saved image file: {filename}"
-    return jsonify({"response": response})
+    # Default or optional question
+    question = request.form.get("question", "What is happening in this image?")
+    output = model.generate({"image": image, "text_input": question})
 
-@app.route('/api/audio', methods=['POST'])
-def process_audio():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
-
-    file = request.files['file']
-    filename = secure_filename(file.filename)
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(filepath)
-
-    # Dummy response
-    response = f"Received and saved audio file: {filename}"
-    return jsonify({"response": response})
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    return jsonify({"question": question, "response": output[0]})
