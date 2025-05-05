@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from flask import Flask, request, jsonify
 from llama_cpp import Llama  # Make sure this is imported at the top
 
@@ -6,9 +7,9 @@ app = Flask(__name__)
 # Load the LLaMA model
 llm = Llama(
     model_path = "/home/fifefola/ai-tutor-models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
-    n_ctx=2048,
-    n_threads=4
-)
+	n_ctx=2048,
+	n_threads=4
+	)
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
@@ -17,6 +18,7 @@ def chat():
     if not prompt:
         return jsonify({"response": "No message provided"}), 400
 
+<<<<<<< HEAD
     response = llm(
         prompt,
         max_tokens=200,
@@ -28,3 +30,7 @@ def chat():
 if __name__ == "__main__":
     print("✅ Flask app is starting...")
     app.run(debug=True)
+=======
+    response = llm(prompt)
+    return jsonify({"response": response["choices"][0]["text"]})
+>>>>>>> c4649b1843781ee537835c10287f5007661de500
